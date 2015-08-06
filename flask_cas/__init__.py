@@ -1,7 +1,7 @@
 """
 flask_cas.__init__
 """
-
+import logging
 import flask
 from flask import current_app
 
@@ -15,7 +15,27 @@ except ImportError:
 
 from . import routing
 
-from functools import wraps
+from functools import wraps, partial
+
+class CASFilter:
+    # Test Keywords: '==', '!=', 'in', 'not in'
+    def __init__(self, attribute=None, test="==", key=None):
+        self.attribute = attribute
+        self.key = key
+        self.test = test
+
+    def is_satisfied(self, session: dict):
+        if self.test == "==":
+            return self.attribute == session['CAS_ATTRIBUTES'][self.key]
+        elif self.test == "!=":
+            return self.attribute != session['CAS_ATTRIBUTES'][self.key]
+        elif self.test == "in":
+            return self.attribute in session['CAS_ATTRIBUTES'][self.key]
+        elif self.test == "not in":
+            return self.attribute not in session['CAS_ATTRIBUTES'][self.key]
+        else:
+            raise ValueError("Filter test is not supported.")
+
 
 class CAS(object):
     """
@@ -102,6 +122,26 @@ def login_required(function):
         if 'CAS_USERNAME' not in flask.session:
             flask.session['CAS_AFTER_LOGIN_SESSION_URL'] = flask.request.path
             return login()
+        else:
+            return function(*args, **kwargs)
+    return wrap
+
+def check_authorization(function=None, cas_filters=None):
+    if function is None:
+        return partial(check_authorization, cas_filters=cas_filters)
+
+    @wraps(function)
+    def wrap(*args, **kwargs):
+        if 'CAS_USERNAME' not in flask.session:
+            flask.session['CAS_AFTER_LOGIN_SESSION_URL'] = flask.request.path
+            return login()
+        for authentication_filter in cas_filters:
+            try:
+                if not authentication_filter.is_satisfied(flask.session):
+                    return flask.abort(403)
+            except Exception:
+                logging.error("Filter was not able to be parsed. User will be forbidden.")
+                return flask.abort(403)
         else:
             return function(*args, **kwargs)
     return wrap
