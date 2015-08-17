@@ -15,7 +15,7 @@ except ImportError:
 
 from . import routing
 
-from functools import wraps, partial
+from functools import wraps
 
 # Really bad iterative set implementation, someone should implement a binary tree set at some point
 class IterableSet:
