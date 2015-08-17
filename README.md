@@ -128,8 +128,9 @@ you may use the `cas.login_required` method.
 |CAS_LOGOUT_ROUTE           | '/cas/logout'         |
 |CAS_VALIDATE_ROUTE         | '/cas/serviceValidate'|
 |CAS_AFTER_LOGOUT           | None                  |
+|CAS_FILTERS                | IterableSet()         |
 
-## Example ##
+## Example 1, Authentication ##
 
 ```python
 import flask
@@ -144,6 +145,34 @@ app.config['CAS_AFTER_LOGIN'] = 'route_root'
 
 @app.route('/')
 @login_required
+def route_root():
+    return flask.render_template(
+        'layout.html',
+        username = cas.username,
+        display_name = cas.attributes['cas:displayName']
+    )
+```
+
+## Example 2, Authorization ##
+
+```python
+import flask
+from flask import Flask
+from flask.ext.cas import CAS
+from flask.ext.cas import CASFilter
+from flask.ext.cas import authorization_required
+
+app = Flask(__name__)
+cas = CAS(app, '/cas')
+cas.add_filter(
+    CASFilter( "CN=Student", "in", "cas:memberOf" )
+)
+
+app.config['CAS_SERVER'] = 'https://sso.pdx.edu' 
+app.config['CAS_AFTER_LOGIN'] = 'route_root'
+
+@app.route('/')
+@authorization_required
 def route_root():
     return flask.render_template(
         'layout.html',

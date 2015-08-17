@@ -52,12 +52,13 @@ class CASFilter:
     def __init__(self, attribute=None, test="==", key=None):
         self.attribute = attribute
         self.key = key
+        assert test == "==" or test == "!=" or test == "in" or test == "not in"
         self.test = test
 
     def __str__(self):
         return self.attribute + " " + self.test + " '" + self.key + "'"
 
-    def is_satisfied(self, session: dict):
+    def is_satisfied(self, session):
         if self.test == "==":
             return self.attribute == session['CAS_ATTRIBUTES'][self.key]
         elif self.test == "!=":
@@ -66,8 +67,7 @@ class CASFilter:
             return self.attribute in session['CAS_ATTRIBUTES'][self.key]
         elif self.test == "not in":
             return self.attribute not in session['CAS_ATTRIBUTES'][self.key]
-        else:
-            raise ValueError("Filter test is not supported.")
+        return False
 
 
 class CAS(object):
@@ -90,6 +90,7 @@ class CAS(object):
     |CAS_LOGOUT_ROUTE           | '/cas/logout'         |
     |CAS_VALIDATE_ROUTE         | '/cas/serviceValidate'|
     |CAS_AFTER_LOGOUT           | None                  |
+    |CAS_FILTERS                | IterableSet()         |
     """
 
     def __init__(self, app=None, url_prefix=None):
@@ -145,10 +146,14 @@ class CAS(object):
         return flask.session.get(
             self.app.config['CAS_TOKEN_SESSION_KEY'], None)
 
-    def add_filter(self, filter: CASFilter):
+    def add_filter(self, filter):
+        if not isinstance(filter, CASFilter):
+            raise TypeError("Filter needs to be of type CASFilter")
         self.app.config['CAS_FILTERS'].add(filter)
 
-    def remove_filter(self, filter: CASFilter):
+    def remove_filter(self, filter):
+        if not isinstance(filter, CASFilter):
+            raise TypeError("Filter needs to be of type CASFilter")
         self.app.config['CAS_FILTERS'].remove(filter)
 
     def get_filters(self):
