@@ -17,12 +17,45 @@ from . import routing
 
 from functools import wraps, partial
 
+# Really bad iterative set implementation, someone should implement a binary tree set at some point
+class IterableSet:
+    def __init__(self, items=list()):
+        self.__container = dict()
+        for item in items:
+            self.add(item)
+
+    def __add__(self, other):
+        if isinstance(other, IterableSet):
+            for item in other:
+                self.add(item)
+        else:
+            self.add(other)
+
+    def __iter__(self):
+        return self.__container.values().__iter__()
+
+    def __contains__(self, item):
+        return str(item) in self.__container
+
+    def __getitem__(self, key):
+        return self.__container[str(key)]
+
+    def add(self, item):
+        self.__container[str(item)] = item
+
+    def remove(self, item):
+        self.__container.pop(str(item))
+
+
 class CASFilter:
     # Test Keywords: '==', '!=', 'in', 'not in'
     def __init__(self, attribute=None, test="==", key=None):
         self.attribute = attribute
         self.key = key
         self.test = test
+
+    def __str__(self):
+        return self.attribute + " " + self.test + " '" + self.key + "'"
 
     def is_satisfied(self, session: dict):
         if self.test == "==":
@@ -74,6 +107,8 @@ class CAS(object):
         app.config.setdefault('CAS_VALIDATE_ROUTE', '/cas/serviceValidate')
         # Requires CAS 2.0
         app.config.setdefault('CAS_AFTER_LOGOUT', None)
+
+        app.config.setdefault('CAS_FILTERS', IterableSet())
         # Register Blueprint
         app.register_blueprint(routing.blueprint, url_prefix=url_prefix)
 
@@ -86,7 +121,7 @@ class CAS(object):
 
     def teardown(self, exception):
         ctx = stack.top
-    
+
     @property
     def app(self):
         return self._app or current_app
@@ -108,7 +143,16 @@ class CAS(object):
     @property
     def token(self):
         return flask.session.get(
-            self.app.config['CAS_TOKEN_SESSION_KEY'], None)
+            self.app.config['CAS_TOKEN_SESSION_KEY'], None)\
+
+    def add_filter(self, filter: CASFilter):
+        self.app.config['CAS_FILTERS'].add(filter)
+
+    def remove_filter(self, filter: CASFilter):
+        self.app.config['CAS_FILTERS'].remove(filter)
+
+    def get_filters(self):
+        return self.app.config['CAS_FILTERS']
 
 def login():
     return flask.redirect(flask.url_for('cas.login', _external=True))
@@ -126,16 +170,13 @@ def login_required(function):
             return function(*args, **kwargs)
     return wrap
 
-def check_authorization(function=None, cas_filters=None):
-    if function is None:
-        return partial(check_authorization, cas_filters=cas_filters)
-
+def authorization_required(function):
     @wraps(function)
     def wrap(*args, **kwargs):
         if 'CAS_USERNAME' not in flask.session:
             flask.session['CAS_AFTER_LOGIN_SESSION_URL'] = flask.request.path
             return login()
-        for authentication_filter in cas_filters:
+        for authentication_filter in flask.current_app.config['CAS_FILTERS']:
             try:
                 if not authentication_filter.is_satisfied(flask.session):
                     return flask.abort(403)
