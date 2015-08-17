@@ -143,7 +143,7 @@ class CAS(object):
     @property
     def token(self):
         return flask.session.get(
-            self.app.config['CAS_TOKEN_SESSION_KEY'], None)\
+            self.app.config['CAS_TOKEN_SESSION_KEY'], None)
 
     def add_filter(self, filter: CASFilter):
         self.app.config['CAS_FILTERS'].add(filter)
