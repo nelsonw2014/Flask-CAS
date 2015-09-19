@@ -17,35 +17,6 @@ from . import routing
 
 from functools import wraps
 
-# Really bad iterative set implementation, someone should implement a binary tree set at some point
-class IterableSet:
-    def __init__(self, items=list()):
-        self.__container = dict()
-        for item in items:
-            self.add(item)
-
-    def __add__(self, other):
-        if isinstance(other, IterableSet):
-            for item in other:
-                self.add(item)
-        else:
-            self.add(other)
-
-    def __iter__(self):
-        return self.__container.values().__iter__()
-
-    def __contains__(self, item):
-        return str(item) in self.__container
-
-    def __getitem__(self, key):
-        return self.__container[str(key)]
-
-    def add(self, item):
-        self.__container[str(item)] = item
-
-    def remove(self, item):
-        self.__container.pop(str(item))
-
 
 class CASFilter:
     # Test Keywords: '==', '!=', 'in', 'not in'
@@ -109,7 +80,7 @@ class CAS(object):
         # Requires CAS 2.0
         app.config.setdefault('CAS_AFTER_LOGOUT', None)
 
-        app.config.setdefault('CAS_FILTERS', IterableSet())
+        app.config.setdefault('CAS_FILTERS', set())
         # Register Blueprint
         app.register_blueprint(routing.blueprint, url_prefix=url_prefix)
 
